@@ -1,6 +1,13 @@
 // Generated on <%= (new Date).toISOString().split('T')[0] %> using <%= pkg.name %> <%= pkg.version %>
 'use strict';
 
+var LIVERELOAD_PORT = 35729; 
+var lrSnippet = require('connect-livereload')({ port: LIVERELOAD_PORT });
+var mountFolder = function (connect, dir) {
+  return connect.static(require('path').resolve(dir));
+};
+var path = require('path');
+
 // # Globbing
 // for performance reasons we're only matching one level down:
 // 'test/spec/{,*/}*.js'
@@ -10,20 +17,27 @@
 module.exports = function (grunt) {
 
   // Load grunt tasks automatically
-  require('load-grunt-tasks')(grunt);
+  // require('load-grunt-tasks')(grunt);
+  require('matchdep').filterDev('grunt-*').forEach(grunt.loadNpmTasks);
 
   // Time how long tasks take. Can help when optimizing build times
-  require('time-grunt')(grunt);
+  // require('time-grunt')(grunt);
+
+  var yeomanConfig = {
+    app: 'app',
+    dist: 'dist',
+    server: 'server'
+  };
+
+  try {
+    yeomanConfig.app = require('./component.json').appPath || yeomanConfig.app;
+  } catch (e) {}
 
   // Define the configuration for all the tasks
   grunt.initConfig({
 
     // Project settings
-    yeoman: {
-      // configurable paths
-      app: require('./bower.json').appPath || 'app',
-      dist: 'dist'
-    },
+    yeoman: yeomanConfig,
 
     // Watches files for changes and runs tasks based on the changed files
     watch: {<% if (coffee) { %>
@@ -65,8 +79,10 @@ module.exports = function (grunt) {
           '<%%= yeoman.app %>/{,*/}*.html',
           '.tmp/styles/{,*/}*.css',<% if (coffee) { %>
           '.tmp/scripts/{,*/}*.js',<% } %>
-          '<%%= yeoman.app %>/images/{,*/}*.{png,jpg,jpeg,gif,webp,svg}'
-        ]
+          '<%%= yeoman.app %>/images/{,*/}*.{png,jpg,jpeg,gif,webp,svg}',
+          '<%%= yeoman.server %>'
+        ],
+        tasks: ['livereload']
       }
     },
 
@@ -80,21 +96,23 @@ module.exports = function (grunt) {
       },
       livereload: {
         options: {
-          open: true,
-          base: [
-            '.tmp',
-            '<%%= yeoman.app %>'
-          ]
+          middleware: function (connect) {
+            return [
+              lrSnippet,
+              mountFolder(connect, '.tmp'),
+              mountFolder(connect, yeomanConfig.app)
+            ];
+          }
         }
       },
       test: {
         options: {
-          port: 9001,
-          base: [
-            '.tmp',
-            'test',
-            '<%%= yeoman.app %>'
-          ]
+          middleware: function (connect) {
+            return [
+              mountFolder(connect, '.tmp'),
+              mountFolder(connect, 'test')
+            ];
+          }  
         }
       },
       dist: {
@@ -104,6 +122,30 @@ module.exports = function (grunt) {
       }
     },
 
+    express: {
+      livereload: {
+        options: {
+          port: 9000,
+          bases: [ path.resolve('.tmp'), path.resolve(yeomanConfig.app) ],
+          monitor: {},
+          debug: true
+        }
+      },
+      test: {
+        options: {
+          port: 9000,
+          bases: [ path.resolve('.tmp'), path.resolve(yeomanConfig.app) ],
+          monitor: {},
+          debug: true //,
+          // server: path.resolve('/app')
+        }
+      }
+    },
+    open: {
+      server: {
+        url: 'http://localhost:<%%= connect.options.port %>'
+      }
+    },
     // Make sure code styles are up to par and there are no obvious mistakes
     jshint: {
       options: {
@@ -396,6 +438,7 @@ module.exports = function (grunt) {
     }
   });
 
+  grunt.renameTask('regarde', 'watch');
 
   grunt.registerTask('serve', function (target) {
     if (target === 'dist') {
@@ -447,4 +490,26 @@ module.exports = function (grunt) {
     'test',
     'build'
   ]);
+
+  grunt.registerTask('express-server', [
+    'clean:server',
+    //'coffee:dist',
+    //'compass:server',
+    'concurrent:server',
+    //'connect:livereload',
+    'express:livereload',
+    'open',
+    'watch'
+  ]);
+
+  grunt.registerTask('express-test', [
+    'clean:server',
+    'coffee',
+    'compass',
+    'connect:test',
+    'karma'
+  ]);
+
+  grunt.registerTask('travis', ['jshint', 'test']);
+
 };

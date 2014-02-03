@@ -15,7 +15,7 @@
   "main": "app/index.js",
   "repository": "yeoman/generator-angular",
   "scripts": {
-    "test": "mocha test/*.js"
+    "test": "mocha"
   },
   "dependencies": {
     "yeoman-generator": "~0.16.0",
